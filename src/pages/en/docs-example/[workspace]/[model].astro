@@ -1,0 +1,10 @@
+﻿---
+import ModelDocPage from '../../../../components/ModelDocPage.astro';
+import { getModelStaticPaths } from '../../../../utils/markdown';
+
+export const getStaticPaths = getModelStaticPaths;
+
+const { folderName } = Astro.props;
+---
+
+<ModelDocPage locale="en" folderName={folderName} />

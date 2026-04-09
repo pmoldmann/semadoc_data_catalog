@@ -1,0 +1,342 @@
+---
+/**
+ * Shared component for the model documentation detail page.
+ * Used by both DE and EN [model].astro page wrappers.
+ */
+import '../styles/prose-content.css';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import type { Locale } from '../i18n';
+import { loadModelData } from '../utils/markdown';
+
+interface Props {
+  locale: Locale;
+  folderName: string;
+}
+
+const { locale, folderName } = Astro.props;
+const { modelTitle, docs, helpHtml, strings } = loadModelData(folderName, locale);
+const dl = strings.doc_labels;
+---
+
+<BaseLayout
+  title={`${modelTitle} — ${dl.page_title_suffix}`}
+  description={`${dl.page_description} "${modelTitle}".`}
+  locale={locale}
+  currentPath="docs-example"
+>
+  <script is:inline>(function(){if(localStorage.getItem('semadoc-theme')==='dark')document.documentElement.classList.add('dark');if(localStorage.getItem('semadoc-embed')==='true')document.documentElement.classList.add('embed-diagrams');})()</script>
+  <section class="py-12 bg-neutral-50 min-h-screen">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <!-- Header -->
+      <div id="page-header" class="mb-8">
+        <div class="flex items-center justify-between">
+          <a href={`/${locale}/docs-example`} class="text-accent-600 hover:text-accent-500 text-sm font-medium">{dl.back_to_catalog}</a>
+          <div class="flex items-center gap-2">
+            <button id="help-toggle" type="button" class="p-2 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-100 transition-colors" title={strings.catalog.help}>
+              <svg class="w-5 h-5 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </button>
+            <button id="embed-toggle" type="button" class="p-2 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-100 transition-colors" title={dl.embed_toggle_title}>
+              <svg class="embed-icon-expand w-5 h-5 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+              <svg class="embed-icon-collapse hidden w-5 h-5 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20v-12m0 0L3 12m4-4l4 4m6-4V16m0 0l4-4m-4 4l-4-4" /></svg>
+            </button>
+            <button id="print-btn" type="button" class="p-2 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-100 transition-colors" title={dl.print_title}>
+              <svg class="w-5 h-5 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm0-16h6a2 2 0 012 2v2H7V5a2 2 0 012-2z" /></svg>
+            </button>
+            <button id="export-html-btn" type="button" class="p-2 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-100 transition-colors" title={dl.export_html_title}>
+              <svg class="w-5 h-5 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            </button>
+            <button id="dark-toggle" type="button" class="p-2 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-100 transition-colors" title={dl.dark_toggle_title}>
+            <svg class="dark-icon-moon w-5 h-5 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+            <svg class="dark-icon-sun hidden w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+          </button>
+          </div>
+        </div>
+        <p class="text-sm font-medium text-accent-600 mb-2 mt-4 tracking-wide uppercase">SemaDoc</p>
+        <h1 class="text-3xl font-bold text-primary-700 mb-2">{modelTitle}</h1>
+        <p class="text-neutral-600">
+          {dl.intro_text}
+        </p>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="border-b border-neutral-200 mb-8 overflow-x-auto">
+        <nav class="flex gap-1 min-w-max" id="doc-tabs">
+          {docs.map(({ slug, label }, i) => (
+            <button
+              data-tab={slug}
+              class:list={[
+                'doc-tab px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
+                i === 0
+                  ? 'border-accent-600 text-accent-600'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300',
+              ]}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      <!-- Tab Content -->
+      {docs.map(({ slug, html }, i) => (
+        <div
+          id={`tab-${slug}`}
+          class:list={['doc-panel', i === 0 ? '' : 'hidden']}
+        >
+          <article class="prose prose-neutral max-w-none bg-white rounded-xl p-4 sm:p-6 lg:p-8 border border-neutral-100 shadow-sm" set:html={html} />
+        </div>
+      ))}
+
+      <!-- Back link -->
+      <div class="mt-8">
+        <a href={`/${locale}/docs-example`} class="text-accent-600 hover:text-accent-500 text-sm font-medium">
+          {dl.back_to_catalog}
+        </a>
+      </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="hidden fixed inset-0 z-50">
+      <div class="absolute inset-0 bg-black/50" id="help-modal-backdrop"></div>
+      <div class="absolute inset-4 sm:inset-8 md:inset-12 lg:inset-16 bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-neutral-200 flex-shrink-0">
+          <h2 class="text-lg font-bold text-primary-700">{strings.catalog.help_doc_title}</h2>
+          <button id="help-modal-close" type="button" class="p-2 rounded-lg hover:bg-neutral-100 transition-colors" title={strings.catalog.close}>
+            <svg class="w-5 h-5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-6">
+          <article class="prose prose-neutral max-w-none" set:html={helpHtml} />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Inject i18n labels for client-side JS -->
+  <script is:inline define:vars={{ docLabels: dl }}>
+    window.__docLabels = docLabels;
+  </script>
+
+  <!-- Mermaid -->
+  <script is:inline src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script is:inline>
+    if (typeof mermaid !== 'undefined') {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
+        securityLevel: 'loose',
+        flowchart: { useMaxWidth: true },
+        er: { useMaxWidth: true },
+      });
+    }
+    window.noop = function() {};
+  </script>
+
+  <!-- highlight.js -->
+  <link id="hljs-theme-light" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github.min.css" />
+  <link id="hljs-theme-dark" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github-dark.min.css" disabled />
+  <script is:inline>if(document.documentElement.classList.contains('dark')){var _l=document.getElementById('hljs-theme-light');var _d=document.getElementById('hljs-theme-dark');if(_l)_l.disabled=true;if(_d)_d.disabled=false;}</script>
+  <script is:inline src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+
+  <style is:global>
+    /* ── ModelDocPage-specific styles ── */
+    html.dark .svg-embed-viewport .svg-embed-inner svg { background-color: transparent; }
+    /* Help modal dark mode */
+    html.dark #help-modal > div:last-child { background-color: #1e293b; }
+    html.dark #help-modal h2 { color: #e2e8f0; }
+    html.dark #help-modal .border-neutral-200 { border-color: #334155; }
+    html.dark #help-modal .prose { color: #cbd5e1; }
+    html.dark #help-modal svg.text-neutral-500 { color: #94a3b8; }
+    html.dark #help-toggle { background-color: #1e293b; border-color: #475569; }
+    html.dark #help-toggle:hover { background-color: #334155; }
+    html.dark #help-toggle svg { color: #e2e8f0; }
+    /* Print: additional hidden elements */
+    @media print {
+      #help-toggle, #help-modal,
+      #doc-tabs, .border-b.border-neutral-200.mb-8 {
+        display: none !important;
+      }
+      a[href*="docs-example"]:not(.prose a) { display: none !important; }
+    }
+  </style>
+
+  <script is:inline src="/scripts/semadoc-handlers.js"></script>
+  <script is:inline>
+    var _dl = window.__docLabels || {};
+
+    /* ── Rewrite Mermaid click-href links (rendered as SVG <a>) ── */
+    function rewriteMermaidLinks(el) {
+      var svgEl = el.tagName === 'svg' ? el : el.querySelector('svg');
+      if (!svgEl) return;
+      var links = svgEl.querySelectorAll('a');
+      for (var i = 0; i < links.length; i++) {
+        var a = links[i];
+        var href = a.getAttribute('href') || a.getAttributeNS('http://www.w3.org/1999/xlink', 'href') || '';
+        var match = href.match(/^(\w+_documentation\.md)(?:#(.+))?$/);
+        if (!match) continue;
+        var filePart = match[1];
+        var fragment = match[2] || '';
+        var tabSlug = filePart.replace('_documentation.md', '').replace('import_logic', 'import').replace('calculation_item', 'calculation');
+        var newHash = '#' + (fragment ? tabSlug + '__' + fragment : tabSlug);
+        a.setAttribute('href', newHash);
+        if (a.hasAttributeNS('http://www.w3.org/1999/xlink', 'href')) {
+          a.setAttributeNS('http://www.w3.org/1999/xlink', 'href', newHash);
+        }
+        a.addEventListener('click', (function(tab, anchor) {
+          return function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            switchTab(tab);
+            if (anchor) {
+              setTimeout(function() {
+                var target = document.getElementById(anchor);
+                if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }, 150);
+            }
+          };
+        })(tabSlug, fragment));
+      }
+    }
+
+    initSemadocHandlers({
+      labels: _dl,
+      onMermaidRendered: rewriteMermaidLinks,
+      getTitleForExport: function() {
+        var h1 = document.querySelector('#page-header h1');
+        return h1 ? h1.textContent : 'SemaDoc-Export';
+      }
+    });
+
+    document.querySelectorAll('.doc-tab').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var tab = this.getAttribute('data-tab');
+        switchTab(tab);
+      });
+    });
+
+    document.querySelectorAll('.doc-tab-link').forEach(function(link) {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        var tab = this.getAttribute('data-tab');
+        var anchor = this.getAttribute('data-anchor');
+        switchTab(tab);
+        if (anchor) {
+          setTimeout(function() {
+            var panel = document.getElementById('tab-' + tab);
+            var target = panel ? panel.querySelector('#' + CSS.escape(anchor)) : document.getElementById(anchor);
+            if (target) {
+              target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }, 80);
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      });
+    });
+
+    // Handle plain in-doc anchor links (e.g. href="#reseller") within tab panels.
+    // Since all panels are in the DOM simultaneously, duplicate IDs across tabs would
+    // cause the browser to scroll to the wrong (hidden) panel. Instead, we intercept
+    // these clicks and search for the target within the currently active panel only.
+    document.querySelectorAll('.doc-panel').forEach(function(panel) {
+      panel.addEventListener('click', function(e) {
+        var link = e.target.closest('a[href^="#"]');
+        if (!link || link.classList.contains('doc-tab-link')) return;
+        var anchor = link.getAttribute('href').replace('#', '');
+        if (!anchor) return;
+        // Only intercept if this panel contains an element with that ID
+        var target = panel.querySelector('#' + CSS.escape(anchor));
+        if (target) {
+          e.preventDefault();
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+
+    function handleHash() {
+      var hash = window.location.hash.replace('#', '');
+      if (!hash) return;
+
+      // Support compound hashes: tab__heading-slug or tab__heading-slug__occurrence
+      var parts = hash.split('__');
+      var tab = parts[0];
+      var headingSlug = parts[1] || '';
+      var occurrence = parseInt(parts[2] || '0', 10) || 0;
+
+      if (tab && document.getElementById('tab-' + tab)) {
+        switchTab(tab);
+
+        if (headingSlug) {
+          setTimeout(function() {
+            var panel = document.getElementById('tab-' + tab);
+            if (!panel) return;
+            var candidates = panel.querySelectorAll('[id="' + headingSlug + '"]');
+            var target = candidates[occurrence] || candidates[0];
+            if (target) {
+              target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }, 150);
+        }
+      }
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.doc-tab').forEach(function(b) {
+        b.classList.remove('border-accent-600', 'text-accent-600');
+        b.classList.add('border-transparent', 'text-neutral-500');
+      });
+      document.querySelectorAll('.doc-panel').forEach(function(p) {
+        p.classList.add('hidden');
+      });
+
+      var activeBtn = document.querySelector('.doc-tab[data-tab="' + tab + '"]');
+      if (activeBtn) {
+        activeBtn.classList.add('border-accent-600', 'text-accent-600');
+        activeBtn.classList.remove('border-transparent', 'text-neutral-500');
+      }
+      var activePanel = document.getElementById('tab-' + tab);
+      if (activePanel) {
+        activePanel.classList.remove('hidden');
+        initMermaid();
+        initSvgEmbeds();
+      }
+
+      initScrollIndicators();
+      initSortableTables();
+      initColumnToggle();
+      addCopyButtons();
+      window.location.hash = tab;
+    }
+
+    registerCustomLanguages();
+    if (typeof hljs !== 'undefined') hljs.highlightAll();
+
+    window.addEventListener('load', function() {
+      if (typeof hljs !== 'undefined') {
+        hljs.highlightAll();
+      }
+      initMermaid();
+      initSvgEmbeds();
+      initScrollIndicators();
+      handleHash();
+      initSortableTables();
+      initColumnToggle();
+      addCopyButtons();
+    });
+  </script>
+
+  <script is:inline>
+    (function() {
+      var modal = document.getElementById('help-modal');
+      var toggle = document.getElementById('help-toggle');
+      var closeBtn = document.getElementById('help-modal-close');
+      var backdrop = document.getElementById('help-modal-backdrop');
+      function openHelp() { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; initMermaid(); initSvgEmbeds(); }
+      function closeHelp() { modal.classList.add('hidden'); document.body.style.overflow = ''; }
+      if (toggle) toggle.addEventListener('click', openHelp);
+      if (closeBtn) closeBtn.addEventListener('click', closeHelp);
+      if (backdrop) backdrop.addEventListener('click', closeHelp);
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeHelp(); });
+    })();
+  </script>
+</BaseLayout>

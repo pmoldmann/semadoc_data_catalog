@@ -1,0 +1,1676 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { Marked } from 'marked';
+import { t } from '../../i18n';
+import fs from 'node:fs';
+import path from 'node:path';
+import { toUrlSlug, extractModelTitle, extractWorkspace } from '../../utils/slug';
+
+const locale = 'en';
+const strings = t(locale);
+
+const docsDir = path.resolve('src/data/markdown');
+const modelDirs = fs.readdirSync(docsDir).filter(d =>
+  fs.statSync(path.join(docsDir, d)).isDirectory()
+);
+
+function createMarked(workspaceSlug: string, modelSlug: string, modelPath: string) {
+  const m = new Marked();
+  m.use({
+    renderer: {
+      code({ text, lang }: { text: string; lang?: string }) {
+        if (lang === 'mermaid') {
+          return `<pre class="mermaid-source">${text}</pre>`;
+        }
+        if (lang === 'svg') {
+          let svgContent = '';
+          if (text.trimStart().startsWith('<')) {
+            svgContent = text.replace(/<script[\s\S]*?<\/script\s*>/gi, '');
+          } else {
+            const fileName = text.trim();
+            if (!/^[\w.\-]+\.svg$/i.test(fileName)) {
+              return `<div class="text-sm text-red-500 italic py-4">Invalid SVG filename: ${fileName.replace(/</g, '&lt;')}</div>`;
+            }
+            const svgFilePath = path.join(modelPath, fileName);
+            if (!fs.existsSync(svgFilePath)) {
+              return `<div class="text-sm text-red-500 italic py-4">SVG file not found: ${fileName}</div>`;
+            }
+            svgContent = fs.readFileSync(svgFilePath, 'utf-8').replace(/<script[\s\S]*?<\/script\s*>/gi, '');
+          }
+          const animated = /@keyframes|animation\s*:|animation-name\s*:|<animate[\s>]|<animateTransform[\s>]|<animateMotion[\s>]|<set[\s>]/.test(svgContent);
+          return `<div class="svg-source" data-animated="${animated}">${svgContent}</div>`;
+        }
+        const langClass = lang ? ` class="language-${lang}"` : '';
+        const escaped = text
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        return `<pre><code${langClass}>${escaped}</code></pre>`;
+      },
+      link({ href, text }: { href: string; text: string }) {
+        if (href) {
+          const hashIdx = href.indexOf('#');
+          const filePart = hashIdx >= 0 ? href.substring(0, hashIdx) : href;
+          const fragment = hashIdx >= 0 ? href.substring(hashIdx + 1) : '';
+          if (filePart.endsWith('.md')) {
+            const tabSlug = filePart.replace('_documentation.md', '').replace('import_logic', 'import').replace('calculation_item', 'calculation');
+            const anchor = fragment || tabSlug;
+            return `<a href="/${locale}/docs-example/${workspaceSlug}/${modelSlug}#${anchor}" class="text-accent-600 hover:text-accent-500 underline">${text}</a>`;
+          }
+          if (href.startsWith('#')) {
+            return `<a href="${href}" class="text-accent-600 hover:text-accent-500 underline">${text}</a>`;
+          }
+        }
+        return `<a href="${href}" class="text-accent-600 hover:text-accent-500 underline" target="_blank" rel="noopener noreferrer">${text}</a>`;
+      },
+    },
+  });
+  return m;
+}
+
+function sanitizeHtml(html: string): string {
+  const svgBlocks: string[] = [];
+  const safe = html.replace(/<div class="svg-source"[^>]*>[\s\S]*?<\/div>/gi, m => {
+    svgBlocks.push(m);
+    return `<!--SVG_PLACEHOLDER_${svgBlocks.length - 1}-->`;
+  });
+  const sanitized = safe
+    .replace(/<(\/?)(style)(\s|>)/gi, '&lt;$1$2$3')
+    .replace(/<(\/?)(script)(\s|>)/gi, '&lt;$1$2$3');
+  return sanitized.replace(/<!--SVG_PLACEHOLDER_(\d+)-->/g, (_, i) => svgBlocks[Number(i)]);
+}
+
+// Build model data for catalog
+const models = modelDirs.map(dir => {
+  const modelPath = path.join(docsDir, dir);
+  const modelMd = fs.readFileSync(path.join(modelPath, 'model_documentation.md'), 'utf-8');
+  const title = extractModelTitle(modelMd, dir);
+
+  // Extract workspace from metadata
+  const workspace = extractWorkspace(modelMd) || '';
+  const workspaceSlug = toUrlSlug(workspace || 'default');
+  const modelSlug = toUrlSlug(dir);
+
+  // Count doc files
+  const fileCount = fs.readdirSync(modelPath).filter(f => f.endsWith('.md')).length;
+
+  const marked = createMarked(workspaceSlug, modelSlug, modelPath);
+  const previewHtml = sanitizeHtml(marked.parse(modelMd) as string);
+
+  return { slug: dir, title, workspace, workspaceSlug, modelSlug, fileCount, previewHtml };
+});
+
+// Collect unique workspaces
+const workspaces = [...new Set(models.map(m => m.workspace).filter(Boolean))].sort();
+---
+
+<BaseLayout
+  title="SemaDoc Data Catalog – Power BI Semantic Model Documentation"
+  description="Enterprise data catalog for Power BI: Browse automatically generated documentation for your Semantic Models – tables, measures, DAX, Power Query & more."
+  locale={locale}
+  currentPath="docs-example"
+  keywords="SemaDoc, data catalog, Power BI documentation, Semantic Model, DAX, Power Query, measures, table documentation"
+>
+  <script is:inline>(function(){if(localStorage.getItem('semadoc-theme')==='dark')document.documentElement.classList.add('dark');})()</script>
+  <section class="py-12 bg-neutral-50 min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <!-- Header -->
+      <div class="mb-8">
+        <div class="flex items-center justify-between">
+          <p class="text-sm font-medium text-accent-600 mb-2 tracking-wide uppercase">SemaDoc</p>
+          <div class="flex items-center gap-2">
+            <button id="help-toggle" type="button" class="p-2 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-100 transition-colors" title={strings.catalog.help}>
+              <svg class="w-5 h-5 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </button>
+            <button id="dark-toggle" type="button" class="p-2 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-100 transition-colors" title="Dark / Light Mode">
+              <svg class="dark-icon-moon w-5 h-5 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+              <svg class="dark-icon-sun hidden w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+            </button>
+          </div>
+        </div>
+        <h1 class="text-3xl font-bold text-primary-700 mb-2">{strings.catalog.title}</h1>
+        <p class="text-neutral-600">{strings.catalog.subtitle}</p>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="mb-8">
+        <div class="relative">
+          <svg class="absolute left-4 top-3.5 w-5 h-5 text-neutral-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            id="catalog-search"
+            placeholder={strings.catalog.search_placeholder}
+            class="w-full px-4 py-3 pl-12 border border-neutral-200 rounded-xl bg-white focus:ring-2 focus:ring-accent-400 focus:border-accent-400 outline-none text-neutral-800"
+          />
+          <button
+            id="clear-search"
+            class="hidden absolute right-4 top-3.5 text-neutral-400 hover:text-neutral-600"
+            title={strings.catalog.clear_search}
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Search Results (hidden by default) -->
+      <div id="search-results" class="hidden">
+        <div class="flex items-center justify-between mb-6">
+          <h2 id="search-results-heading" class="text-lg font-semibold text-primary-700"></h2>
+        </div>
+        <div class="flex flex-col lg:flex-row gap-8">
+          <div id="search-results-content" class="w-full lg:w-2/5 flex-shrink-0 overflow-y-auto" style="max-height: 80vh;"></div>
+          <div id="search-preview-panel" class="hidden flex-1 min-w-0">
+            <div class="lg:sticky lg:top-24">
+              <div class="flex items-center justify-between mb-3 gap-2">
+                <h3 id="preview-heading" class="text-sm font-semibold text-primary-700 truncate"></h3>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                  <a id="preview-open-link" href="#" class="inline-flex items-center gap-1 px-3 py-1.5 bg-accent-600 text-white text-xs font-medium rounded-lg hover:bg-accent-500 transition-colors whitespace-nowrap">
+                    {strings.catalog.open_document}
+                  </a>
+                  <button id="preview-close" type="button" class="p-1.5 rounded-lg border border-neutral-200 hover:bg-neutral-100 transition-colors" title={strings.catalog.close_preview}>
+                    <svg class="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              </div>
+              <article id="preview-content" class="prose prose-neutral max-w-none bg-white rounded-xl p-6 border border-neutral-100 shadow-sm overflow-y-auto" style="max-height: 70vh;"></article>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Catalog Browser -->
+      <div id="catalog-browser" class="flex flex-col md:flex-row gap-8">
+        <!-- Left: Model List -->
+        <aside class="w-full md:w-80 flex-shrink-0">
+          <!-- Workspace Filter -->
+          {workspaces.length > 1 && (
+            <div class="mb-4">
+              <label for="workspace-filter" class="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1 block">{strings.catalog.workspace_label}</label>
+              <select id="workspace-filter" class="w-full px-3 py-2 border border-neutral-200 rounded-lg bg-white text-sm text-neutral-700 focus:ring-2 focus:ring-accent-400 focus:border-accent-400 outline-none">
+                <option value="">{strings.catalog.all_workspaces}</option>
+                {workspaces.map(ws => (
+                  <option value={ws}>{ws}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <h2 class="text-lg font-semibold text-primary-700 mb-4">{strings.catalog.models_heading}</h2>
+          <div class="space-y-2" id="model-list">
+            {models.map((model, i) => (
+              <button
+                data-model={model.slug}
+                data-workspace={model.workspace}
+                class:list={[
+                  'model-item w-full text-left px-4 py-3 rounded-xl border transition-all',
+                  i === 0
+                    ? 'bg-white border-accent-400 shadow-sm ring-1 ring-accent-400/20'
+                    : 'bg-white border-neutral-100 hover:border-accent-300 hover:shadow-sm',
+                ]}
+              >
+                <div class="font-medium text-primary-700 text-sm">{model.title}</div>
+                <div class="text-xs text-neutral-400 mt-1">
+                  <span class="inline-flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                    {model.workspace}
+                  </span>
+                  <span class="ml-2">{model.fileCount} {strings.catalog.documents_label}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <!-- Right: Model Preview -->
+        <div class="flex-1 min-w-0">
+          {models.length === 0 && (
+            <div class="text-center text-neutral-400 py-20">
+              {strings.catalog.select_model_hint}
+            </div>
+          )}
+          {models.map((model, i) => (
+            <div
+              id={`preview-${model.slug}`}
+              data-model-url={`/en/docs-example/${model.workspaceSlug}/${model.modelSlug}`}
+              class:list={['model-preview', i === 0 ? '' : 'hidden']}
+            >
+              <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
+                <h2 class="text-xl font-bold text-primary-700">{model.title}</h2>
+                <a
+                  href={`/en/docs-example/${model.workspaceSlug}/${model.modelSlug}`}
+                  class="inline-flex items-center gap-1 px-4 py-2 bg-accent-600 text-white text-sm font-medium rounded-lg hover:bg-accent-500 transition-colors whitespace-nowrap"
+                >
+                  {strings.catalog.view_full_docs}
+                </a>
+              </div>
+              <article class="prose prose-neutral max-w-none bg-white rounded-xl p-8 border border-neutral-100 shadow-sm" set:html={model.previewHtml} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Catalog Help Modal -->
+    <div id="help-modal" class="hidden fixed inset-0 z-50">
+      <div class="absolute inset-0 bg-black/50" id="help-modal-backdrop"></div>
+      <div class="absolute inset-4 sm:inset-8 md:inset-16 lg:inset-24 bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden max-w-3xl mx-auto">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-neutral-200 flex-shrink-0">
+          <h2 class="text-lg font-bold text-primary-700">{strings.catalog.help_catalog_title}</h2>
+          <button id="help-modal-close" type="button" class="p-2 rounded-lg hover:bg-neutral-100 transition-colors" title={strings.catalog.close}>
+            <svg class="w-5 h-5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-6">
+          <p class="text-neutral-600 mb-6">{strings.catalog.help_catalog_intro}</p>
+          <div class="space-y-6">
+            <div class="bg-neutral-50 rounded-xl p-5 border border-neutral-100">
+              <h3 class="font-semibold text-primary-700 mb-2 flex items-center gap-2">
+                <svg class="w-5 h-5 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                {strings.catalog.help_catalog_workspace_title}
+              </h3>
+              <p class="text-sm text-neutral-600 leading-relaxed">{strings.catalog.help_catalog_workspace_desc}</p>
+            </div>
+            <div class="bg-neutral-50 rounded-xl p-5 border border-neutral-100">
+              <h3 class="font-semibold text-primary-700 mb-2 flex items-center gap-2">
+                <svg class="w-5 h-5 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4" /></svg>
+                {strings.catalog.help_catalog_model_title}
+              </h3>
+              <p class="text-sm text-neutral-600 leading-relaxed">{strings.catalog.help_catalog_model_desc}</p>
+            </div>
+            <div class="bg-neutral-50 rounded-xl p-5 border border-neutral-100">
+              <h3 class="font-semibold text-primary-700 mb-2 flex items-center gap-2">
+                <svg class="w-5 h-5 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                {strings.catalog.help_catalog_preview_title}
+              </h3>
+              <p class="text-sm text-neutral-600 leading-relaxed">{strings.catalog.help_catalog_preview_desc}</p>
+            </div>
+            <div class="bg-neutral-50 rounded-xl p-5 border border-neutral-100">
+              <h3 class="font-semibold text-primary-700 mb-2 flex items-center gap-2">
+                <svg class="w-5 h-5 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                {strings.catalog.help_catalog_search_title}
+              </h3>
+              <p class="text-sm text-neutral-600 leading-relaxed">{strings.catalog.help_catalog_search_desc}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Marked.js for client-side markdown preview -->
+  <script is:inline src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
+
+  <!-- Mermaid for model previews -->
+  <script is:inline src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script is:inline>
+    if (typeof mermaid !== 'undefined') {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
+        securityLevel: 'loose',
+        flowchart: { useMaxWidth: true },
+        er: { useMaxWidth: true },
+      });
+    }
+    window.noop = function() {};
+  </script>
+
+  <style is:global>
+    .prose pre.mermaid,
+    .prose pre.mermaid-source {
+      background: transparent;
+      border: none;
+      padding: 0;
+      text-align: center;
+      overflow-x: auto;
+    }
+    .prose pre.mermaid svg {
+      max-width: 100%;
+      height: auto;
+    }
+    /* Mermaid zoom & fullscreen */
+    .mermaid-wrapper {
+      position: relative;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      margin: 1rem 0;
+    }
+    .mermaid-viewport {
+      overflow: auto;
+      padding: 1rem;
+      cursor: grab;
+      max-height: 70vh;
+    }
+    .mermaid-viewport.dragging,
+    .mermaid-viewport.dragging * {
+      cursor: grabbing !important;
+      user-select: none;
+    }
+    .mermaid-viewport > pre.mermaid {
+      transform-origin: 0 0;
+      display: inline-block;
+      min-width: 100%;
+    }
+    .mermaid-controls {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      display: flex;
+      gap: 0.25rem;
+      z-index: 10;
+    }
+    .mermaid-controls button {
+      width: 2rem;
+      height: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      border: 1px solid #d1d5db;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      color: #374151;
+      font-size: 1rem;
+      line-height: 1;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .mermaid-controls button:hover {
+      background: #f3f4f6;
+      border-color: #9ca3af;
+    }
+    .mermaid-zoom-label {
+      width: auto !important;
+      padding: 0 0.375rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: default !important;
+      user-select: none;
+    }
+    .mermaid-fullscreen-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(0,0,0,0.85);
+      display: none;
+      flex-direction: column;
+    }
+    .mermaid-fullscreen-overlay.active {
+      display: flex;
+    }
+    .mermaid-fullscreen-header {
+      display: flex;
+      justify-content: flex-end;
+      padding: 0.75rem 1rem;
+      gap: 0.25rem;
+      background: rgba(0,0,0,0.3);
+    }
+    .mermaid-fullscreen-header button {
+      width: 2rem;
+      height: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 0.375rem;
+      cursor: pointer;
+      color: white;
+      font-size: 1rem;
+      line-height: 1;
+      transition: background 0.15s;
+    }
+    .mermaid-fullscreen-header button:hover {
+      background: rgba(255,255,255,0.25);
+    }
+    .mermaid-fullscreen-body {
+      flex: 1;
+      overflow: auto;
+      padding: 1rem;
+      cursor: grab;
+    }
+    .mermaid-fullscreen-body.dragging,
+    .mermaid-fullscreen-body.dragging * {
+      cursor: grabbing !important;
+      user-select: none;
+    }
+    .mermaid-fullscreen-body .fs-svg-container {
+      background: white;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      display: inline-block;
+      margin: 0 auto;
+      transform-origin: 0 0;
+    }
+    /* ── SVG embed styles ── */
+    .svg-embed-wrapper {
+      position: relative;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      margin: 1rem 0;
+    }
+    .svg-embed-viewport {
+      overflow: auto;
+      padding: 1rem;
+      cursor: grab;
+      max-height: 70vh;
+      text-align: center;
+    }
+    .svg-embed-viewport.dragging,
+    .svg-embed-viewport.dragging * {
+      cursor: grabbing !important;
+      user-select: none;
+    }
+    .svg-embed-viewport > .svg-embed-inner {
+      transform-origin: 0 0;
+      display: inline-block;
+      min-width: 100%;
+    }
+    .svg-embed-viewport svg {
+      max-width: 100%;
+      height: auto;
+    }
+    .svg-embed-controls {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      display: flex;
+      gap: 0.25rem;
+      z-index: 10;
+    }
+    .svg-embed-controls button {
+      width: 2rem;
+      height: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      border: 1px solid #d1d5db;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      color: #374151;
+      font-size: 1rem;
+      line-height: 1;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .svg-embed-controls button:hover {
+      background: #f3f4f6;
+      border-color: #9ca3af;
+    }
+    .svg-embed-zoom-label {
+      width: auto !important;
+      padding: 0 0.375rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: default !important;
+      user-select: none;
+    }
+    .svg-embed-controls .svg-pause-btn {
+      font-size: 0.875rem;
+    }
+    html.dark .svg-embed-wrapper { border-color: #475569; }
+    html.dark .svg-embed-controls button { background-color: #1e293b; border-color: #475569; color: #e2e8f0; }
+    html.dark .svg-embed-controls button:hover { background-color: #334155; }
+    .fs-zoom-label {
+      width: auto !important;
+      padding: 0 0.375rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: default !important;
+      user-select: none;
+    }
+    .prose table {
+      @apply w-full text-sm;
+      table-layout: auto;
+    }
+    .prose th {
+      @apply bg-neutral-50 text-left px-3 py-2 font-semibold text-neutral-700 border border-neutral-200;
+    }
+    .prose td {
+      @apply px-3 py-2 border border-neutral-200 text-neutral-600;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+    .prose pre:not(.mermaid):not(.mermaid-source) {
+      @apply bg-neutral-50 rounded-lg p-4 overflow-x-auto text-sm border border-neutral-200;
+    }
+    .prose code:not(pre code) {
+      @apply bg-neutral-100 rounded px-1.5 py-0.5 text-sm text-neutral-800;
+    }
+    .prose h1 {
+      @apply text-2xl font-bold text-primary-700 mt-8 mb-4;
+    }
+    .prose h2 {
+      @apply text-xl font-bold text-primary-700 mt-8 mb-3;
+    }
+    .prose h3 {
+      @apply text-lg font-semibold text-primary-700 mt-6 mb-2;
+    }
+    .prose h4 {
+      @apply text-base font-semibold text-neutral-700 mt-4 mb-2;
+    }
+    .prose blockquote {
+      @apply border-l-4 border-accent-400 bg-accent-400/5 pl-4 py-2 my-4 text-neutral-600;
+    }
+    .prose hr {
+      @apply my-6 border-neutral-200;
+    }
+    .prose ul {
+      @apply list-disc pl-6 space-y-1;
+    }
+    .prose ol {
+      @apply list-decimal pl-6 space-y-1;
+    }
+    .prose a {
+      @apply text-accent-600 underline;
+    }
+    .prose a:hover {
+      @apply text-accent-500;
+    }
+    .prose strong {
+      @apply font-semibold text-neutral-800;
+    }
+    /* ── Dark mode ── */
+    html.dark { color-scheme: dark; }
+    html.dark body { background-color: #0f172a; color: #e2e8f0; }
+    html.dark header.sticky { background-color: rgba(15, 23, 42, 0.9); border-bottom-color: #1e293b; }
+    html.dark header a, html.dark header button#mobile-menu-btn { color: #cbd5e1; }
+    html.dark header a:hover { color: #93c5fd; }
+    html.dark footer { background-color: #0a1425; border-top-color: #1e293b; }
+    html.dark footer p, html.dark footer a { color: #64748b; }
+    html.dark footer a:hover { color: #cbd5e1; }
+    html.dark section.bg-neutral-50 { background-color: #0f172a; }
+    html.dark #dark-toggle { background-color: #1e293b; border-color: #475569; }
+    html.dark #dark-toggle:hover { background-color: #334155; }
+    html.dark .dark-icon-moon { display: none !important; }
+    html.dark .dark-icon-sun { display: block !important; }
+    html.dark #catalog-search { background-color: #1e293b; border-color: #475569; color: #e2e8f0; }
+    html.dark #catalog-search::placeholder { color: #64748b; }
+    html.dark #workspace-filter { background-color: #1e293b; border-color: #475569; color: #e2e8f0; }
+    html.dark .model-item { background-color: #1e293b !important; border-color: #334155 !important; }
+    html.dark .model-item:hover { border-color: #4dabf7 !important; }
+    html.dark .model-item.border-accent-400, html.dark .model-item.ring-1 { border-color: #4dabf7 !important; }
+    html.dark .model-item .font-medium { color: #e2e8f0; }
+    html.dark .model-item .text-xs { color: #64748b; }
+    html.dark h1.text-primary-700, html.dark h2.text-primary-700, html.dark h3.text-primary-700 { color: #e2e8f0; }
+    html.dark p.text-neutral-600 { color: #94a3b8; }
+    html.dark mark.bg-yellow-200 { background-color: #854d0e; color: #fef08a; }
+    html.dark #search-results-content .bg-white { background-color: #1e293b; }
+    html.dark #search-results-content .border-neutral-100 { border-color: #334155; }
+    html.dark .prose { color: #cbd5e1; }
+    html.dark article.prose { background-color: #1e293b !important; border-color: #334155 !important; }
+    html.dark .prose h1, html.dark .prose h2, html.dark .prose h3 { color: #e2e8f0; }
+    html.dark .prose h4 { color: #cbd5e1; }
+    html.dark .prose strong { color: #e2e8f0; }
+    html.dark .prose th { background-color: #172033; color: #e2e8f0; border-color: #475569; }
+    html.dark .prose td { border-color: #475569; color: #cbd5e1; }
+    html.dark .prose pre:not(.mermaid):not(.mermaid-source) { background-color: #0f172a; border-color: #475569; color: #e2e8f0; }
+    html.dark .prose code:not(pre code) { background-color: #334155; color: #e2e8f0; }
+    html.dark .prose blockquote { background-color: rgba(77, 171, 247, 0.08); color: #94a3b8; border-left-color: #339af0; }
+    html.dark .prose hr { border-color: #334155; }
+    html.dark .prose a { color: #4dabf7; }
+    html.dark .prose a:hover { color: #74c0fc; }
+    html.dark .mermaid-wrapper { border-color: #475569; }
+    html.dark .mermaid-controls button { background-color: #1e293b; border-color: #475569; color: #e2e8f0; }
+    html.dark .mermaid-controls button:hover { background-color: #334155; }
+    html.dark .mermaid-fullscreen-body .fs-svg-container { background-color: #1e293b; }
+    html.dark #search-preview-panel h3 { color: #e2e8f0; }
+    html.dark #search-preview-panel #preview-close { background-color: #1e293b; border-color: #475569; }
+    html.dark #search-preview-panel #preview-close:hover { background-color: #334155; }
+    html.dark #search-preview-panel #preview-close svg { color: #94a3b8; }
+    html.dark .search-result-item { background-color: #1e293b !important; border-color: #334155 !important; color: #cbd5e1; }
+    html.dark .search-result-item:hover { border-color: #4dabf7 !important; }
+    html.dark .search-result-item .border-neutral-50 { border-color: #1e293b; }
+    /* Collapsible search result groups */
+    #search-results-content summary { list-style: none; }
+    #search-results-content summary::-webkit-details-marker { display: none; }
+    #search-results-content details[open] > summary .search-chevron { transform: rotate(90deg); }
+    html.dark #search-results-content summary h3,
+    html.dark #search-results-content summary h4 { color: #e2e8f0; }
+    /* Help modal dark mode */
+    html.dark #help-modal > div:last-child { background-color: #1e293b; }
+    html.dark #help-modal h2 { color: #e2e8f0; }
+    html.dark #help-modal .border-neutral-200 { border-color: #334155; }
+    html.dark #help-modal p { color: #94a3b8; }
+    html.dark #help-modal .bg-neutral-50 { background-color: #0f172a; }
+    html.dark #help-modal .border-neutral-100 { border-color: #334155; }
+    html.dark #help-modal h3 { color: #e2e8f0; }
+    html.dark #help-modal svg.text-neutral-500 { color: #94a3b8; }
+    html.dark #help-toggle { background-color: #1e293b; border-color: #475569; }
+    html.dark #help-toggle:hover { background-color: #334155; }
+    html.dark #help-toggle svg { color: #e2e8f0; }
+  </style>
+
+  <script is:inline>
+    var LOCALE = 'en';
+    var searchIndex = null;
+    var searchTimeout = null;
+
+    // Model selection
+    document.querySelectorAll('.model-item').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        selectModel(this.getAttribute('data-model'));
+      });
+    });
+
+    // Workspace filtering
+    var wsFilter = document.getElementById('workspace-filter');
+    if (wsFilter) {
+      wsFilter.addEventListener('change', function() {
+        filterByWorkspace(this.value);
+      });
+    }
+
+    function filterByWorkspace(ws) {
+      var items = document.querySelectorAll('.model-item');
+      var firstVisible = null;
+      items.forEach(function(btn) {
+        var itemWs = btn.getAttribute('data-workspace');
+        var visible = !ws || itemWs === ws;
+        btn.style.display = visible ? '' : 'none';
+        if (visible && !firstVisible) firstVisible = btn;
+      });
+      // Select first visible model
+      if (firstVisible) {
+        selectModel(firstVisible.getAttribute('data-model'));
+      }
+    }
+
+    function selectModel(slug) {
+      // Update button styles
+      document.querySelectorAll('.model-item').forEach(function(b) {
+        b.classList.remove('border-accent-400', 'shadow-sm', 'ring-1', 'ring-accent-400/20');
+        b.classList.add('border-neutral-100');
+      });
+      var activeBtn = document.querySelector('.model-item[data-model="' + slug + '"]');
+      if (activeBtn) {
+        activeBtn.classList.add('border-accent-400', 'shadow-sm', 'ring-1', 'ring-accent-400/20');
+        activeBtn.classList.remove('border-neutral-100');
+      }
+
+      // Show preview
+      document.querySelectorAll('.model-preview').forEach(function(p) {
+        p.classList.add('hidden');
+      });
+      var preview = document.getElementById('preview-' + slug);
+      if (preview) {
+        preview.classList.remove('hidden');
+        initMermaid();
+        initSvgEmbeds();
+      }
+    }
+
+    // Search
+    var searchInput = document.getElementById('catalog-search');
+    var clearBtn = document.getElementById('clear-search');
+    var searchResults = document.getElementById('search-results');
+    var catalogBrowser = document.getElementById('catalog-browser');
+    var searchHeading = document.getElementById('search-results-heading');
+    var searchContent = document.getElementById('search-results-content');
+
+    searchInput.addEventListener('input', function() {
+      var query = this.value.trim();
+      clearBtn.classList.toggle('hidden', query.length === 0);
+
+      clearTimeout(searchTimeout);
+      if (query.length < 2) {
+        showCatalog();
+        return;
+      }
+      searchTimeout = setTimeout(function() { performSearch(query); }, 300);
+    });
+
+    clearBtn.addEventListener('click', function() {
+      searchInput.value = '';
+      clearBtn.classList.add('hidden');
+      showCatalog();
+      searchInput.focus();
+    });
+
+    function showCatalog() {
+      searchResults.classList.add('hidden');
+      catalogBrowser.classList.remove('hidden');
+      closePreview();
+    }
+
+    function showSearchResults() {
+      searchResults.classList.remove('hidden');
+      catalogBrowser.classList.add('hidden');
+    }
+
+    async function loadSearchIndex() {
+      if (searchIndex) return searchIndex;
+      var resp = await fetch('/search-index.json');
+      searchIndex = await resp.json();
+      return searchIndex;
+    }
+
+    function slugifyHeading(text) {
+      return text.toLowerCase().replace(/<[^>]*>/g, '').replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function highlightMatch(text, query) {
+      var idx = text.toLowerCase().indexOf(query.toLowerCase());
+      if (idx === -1) return escapeHtml(text);
+      var before = escapeHtml(text.substring(0, idx));
+      var match = escapeHtml(text.substring(idx, idx + query.length));
+      var after = escapeHtml(text.substring(idx + query.length));
+      return before + '<mark class="bg-yellow-200 rounded px-0.5">' + match + '</mark>' + after;
+    }
+
+    function getSnippet(text, query, contextLen) {
+      contextLen = contextLen || 80;
+      var lower = text.toLowerCase();
+      var idx = lower.indexOf(query.toLowerCase());
+      if (idx === -1) return '';
+      var start = Math.max(0, idx - contextLen);
+      var end = Math.min(text.length, idx + query.length + contextLen);
+      var snippet = (start > 0 ? '…' : '') + text.substring(start, end) + (end < text.length ? '…' : '');
+      return highlightMatch(snippet, query);
+    }
+
+    function renderSnippet(m, query, model, file, docUrl, curIdx) {
+      var snippet = getSnippet(m.text, query);
+      // If query matched only in heading, show a snippet from the beginning of the body text
+      if (!snippet && m.heading && m.heading.toLowerCase().indexOf(query.toLowerCase()) !== -1) {
+        var bodyPreview = m.text.length > 200 ? m.text.substring(0, 200) + '…' : m.text;
+        snippet = escapeHtml(bodyPreview);
+      }
+      if (!snippet) return '';
+      var html = '<div class="search-result-item group bg-white rounded-lg border border-neutral-100 p-3 text-sm text-neutral-600 cursor-pointer hover:border-accent-300 hover:shadow-sm transition-all" data-idx="' + curIdx + '">';
+      if (m.heading) {
+        html += '<div class="text-xs font-medium text-neutral-400 mb-1">' + highlightMatch(escapeHtml(m.heading), query) + '</div>';
+      }
+      html += '<div>' + snippet + '</div>';
+      html += '<div class="flex items-center gap-3 mt-2 pt-2 border-t border-neutral-50">';
+      html += '<button type="button" class="preview-btn inline-flex items-center gap-1 text-xs font-medium text-accent-600 hover:text-accent-500 transition-colors">';
+      html += '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>';
+      html += (LOCALE === 'de' ? 'Vorschau' : 'Preview');
+      html += '</button>';
+      html += '<a href="' + escapeHtml(docUrl) + '" class="inline-flex items-center gap-1 text-xs font-medium text-neutral-400 hover:text-accent-600 transition-colors">';
+      html += '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>';
+      html += (LOCALE === 'de' ? 'Zum Dokument →' : 'Go to document →');
+      html += '</a>';
+      html += '</div>';
+      html += '</div>';
+      return html;
+    }
+
+    async function performSearch(query) {
+      var index = await loadSearchIndex();
+      var totalMatches = 0;
+      var lowerQuery = query.toLowerCase();
+
+      // Group by workspace → model → file
+      var workspaces = {};
+      for (var i = 0; i < index.length; i++) {
+        var entry = index[i];
+        var fileMatches = [];
+        for (var j = 0; j < entry.sections.length; j++) {
+          var section = entry.sections[j];
+          if (section.text.toLowerCase().indexOf(lowerQuery) !== -1 ||
+              section.heading.toLowerCase().indexOf(lowerQuery) !== -1) {
+            fileMatches.push(section);
+            totalMatches++;
+          }
+        }
+        if (fileMatches.length > 0) {
+          var ws = entry.workspace || (LOCALE === 'de' ? 'Ohne Workspace' : 'No Workspace');
+          if (!workspaces[ws]) workspaces[ws] = {};
+          if (!workspaces[ws][entry.model]) {
+            workspaces[ws][entry.model] = { modelTitle: entry.modelTitle, workspaceSlug: entry.workspaceSlug || entry.model, modelSlug: entry.modelSlug || entry.model, files: {} };
+          }
+          var fileLabel = LOCALE === 'de' ? entry.fileLabelDe : entry.fileLabelEn;
+          workspaces[ws][entry.model].files[entry.file] = {
+            label: fileLabel,
+            slug: entry.fileSlug,
+            matches: fileMatches,
+          };
+        }
+      }
+
+      // Render results
+      searchHeading.textContent = (LOCALE === 'de' ? 'Suchergebnisse für' : 'Search results for') +
+        ' "' + query + '" (' + totalMatches + ' ' + (LOCALE === 'de' ? 'Treffer' : 'matches') + ')';
+
+      if (totalMatches === 0) {
+        searchContent.innerHTML = '<div class="text-center text-neutral-400 py-12">' +
+          (LOCALE === 'de' ? 'Keine Treffer gefunden.' : 'No results found.') + '</div>';
+        showSearchResults();
+        return;
+      }
+
+      var html = '';
+      searchResultData = [];
+      var wsKeys = Object.keys(workspaces).sort();
+      var wsCounter = 0;
+
+      for (var wi = 0; wi < wsKeys.length; wi++) {
+        var wsName = wsKeys[wi];
+        var wsModels = workspaces[wsName];
+        var wsId = 'ws-' + (wsCounter++);
+
+        // Workspace group
+        html += '<details class="mb-6" open>';
+        html += '<summary class="flex items-center gap-2 cursor-pointer select-none group mb-3">';
+        html += '<svg class="w-4 h-4 text-neutral-400 transition-transform group-open:rotate-90 search-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>';
+        html += '<svg class="w-5 h-5 text-accent-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>';
+        html += '<h3 class="text-base font-bold text-primary-700">' + escapeHtml(wsName) + '</h3>';
+        html += '</summary>';
+
+        for (var model in wsModels) {
+          var r = wsModels[model];
+
+          // Model group (nested collapsible)
+          html += '<details class="ml-4 mb-4" open>';
+          html += '<summary class="flex items-center gap-2 cursor-pointer select-none group mb-2">';
+          html += '<svg class="w-3.5 h-3.5 text-neutral-400 transition-transform group-open:rotate-90 search-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>';
+          html += '<svg class="w-4 h-4 text-accent-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4" /></svg>';
+          html += '<h4 class="text-sm font-bold text-primary-700">' + escapeHtml(r.modelTitle) + '</h4>';
+          html += '</summary>';
+
+          for (var file in r.files) {
+            var f = r.files[file];
+            var baseUrl = '/' + LOCALE + '/docs-example/' + r.workspaceSlug + '/' + r.modelSlug;
+            html += '<div class="ml-6 mb-4">';
+            html += '<div class="flex items-center gap-2">';
+            html += '<svg class="w-4 h-4 flex-shrink-0 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>';
+            html += '<span class="text-sm font-semibold text-accent-600">' + escapeHtml(f.label) + '</span>';
+            html += '</div>';
+            html += '<div class="mt-2 space-y-2">';
+
+            var maxSnippets = Math.min(f.matches.length, 5);
+            for (var k = 0; k < maxSnippets; k++) {
+              var curIdx = searchResultData.length;
+              var headingSlug = f.matches[k].heading ? slugifyHeading(f.matches[k].heading) : '';
+              var occ = f.matches[k].headingOccurrence || 0;
+              var hash = headingSlug ? f.slug + '__' + headingSlug + (occ > 0 ? '__' + occ : '') : f.slug;
+              var docUrl = baseUrl + '#' + hash;
+              searchResultData.push({ model: model, file: file, heading: f.matches[k].heading, query: query, docUrl: docUrl, sectionText: f.matches[k].text, headingOccurrence: occ });
+              html += renderSnippet(f.matches[k], query, model, file, docUrl, curIdx);
+            }
+            if (f.matches.length > maxSnippets) {
+              var moreCount = f.matches.length - maxSnippets;
+              var moreId = 'more-' + model.replace(/[^a-zA-Z0-9]/g, '_') + '-' + file.replace(/[^a-zA-Z0-9]/g, '_');
+              html += '<div id="' + moreId + '" class="hidden space-y-2">';
+              for (var k = maxSnippets; k < f.matches.length; k++) {
+                var curIdx = searchResultData.length;
+                var headingSlug = f.matches[k].heading ? slugifyHeading(f.matches[k].heading) : '';
+                var occ = f.matches[k].headingOccurrence || 0;
+                var hash = headingSlug ? f.slug + '__' + headingSlug + (occ > 0 ? '__' + occ : '') : f.slug;
+                var docUrl = baseUrl + '#' + hash;
+                searchResultData.push({ model: model, file: file, heading: f.matches[k].heading, query: query, docUrl: docUrl, sectionText: f.matches[k].text, headingOccurrence: occ });
+                html += renderSnippet(f.matches[k], query, model, file, docUrl, curIdx);
+              }
+              html += '</div>';
+              html += '<a href="#" class="show-more-link text-xs text-accent-600 hover:text-accent-500 pl-3 cursor-pointer" data-target="' + moreId + '">+ ' + moreCount + ' ' + (LOCALE === 'de' ? 'weitere Treffer anzeigen' : 'more matches') + '</a>';
+            }
+
+            html += '</div></div>';
+          }
+          html += '</details>';
+        }
+        html += '</details>';
+      }
+      searchContent.innerHTML = html;
+
+      // Attach preview click handlers
+      searchContent.querySelectorAll('.search-result-item').forEach(function(item) {
+        var previewBtn = item.querySelector('.preview-btn');
+        if (previewBtn) {
+          previewBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            showPreview(parseInt(item.dataset.idx));
+          });
+        }
+      });
+
+      // Attach show-more click handlers
+      searchContent.querySelectorAll('.show-more-link').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+          e.preventDefault();
+          var target = document.getElementById(this.getAttribute('data-target'));
+          if (target) {
+            target.classList.remove('hidden');
+            // Attach preview handlers to newly visible items
+            target.querySelectorAll('.search-result-item').forEach(function(item) {
+              var previewBtn = item.querySelector('.preview-btn');
+              if (previewBtn) {
+                previewBtn.addEventListener('click', function(ev) {
+                  ev.stopPropagation();
+                  showPreview(parseInt(item.dataset.idx));
+                });
+              }
+            });
+          }
+          this.style.display = 'none';
+        });
+      });
+
+      showSearchResults();
+    }
+
+    // ── Preview panel logic ──
+    var previewPanel = document.getElementById('search-preview-panel');
+    var previewHeading = document.getElementById('preview-heading');
+    var previewContent = document.getElementById('preview-content');
+    var previewOpenLink = document.getElementById('preview-open-link');
+    var previewCloseBtn = document.getElementById('preview-close');
+    var mdCache = {};
+    var searchResultData = [];
+
+    if (previewCloseBtn) {
+      previewCloseBtn.addEventListener('click', closePreview);
+    }
+
+    function closePreview() {
+      previewPanel.classList.add('hidden');
+      // Deselect active result
+      searchContent.querySelectorAll('.search-result-item').forEach(function(el) {
+        el.classList.remove('ring-2', 'ring-accent-400', 'border-accent-400');
+      });
+    }
+
+    async function fetchMarkdown(model, file) {
+      var cacheKey = model + '/' + file;
+      if (mdCache[cacheKey]) return mdCache[cacheKey];
+      var fileSlug = file.replace('.md', '');
+      var url = '/api/md/' + encodeURIComponent(model) + '/' + encodeURIComponent(fileSlug) + '.json';
+      var resp = await fetch(url);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      var data = await resp.json();
+      mdCache[cacheKey] = data.content;
+      return data.content;
+    }
+
+    function extractContext(mdText, heading, query, contextLines, sectionText, headingOccurrence) {
+      contextLines = contextLines || 15;
+      var lines = mdText.split('\n');
+
+      // Find the line that contains the query match
+      var lowerQuery = query.toLowerCase();
+      var matchLineIdx = -1;
+
+      // First try to find the match within the matching heading's section
+      var sectionStart = -1;
+      var sectionEnd = lines.length;
+
+      if (heading) {
+        // Collect all candidate heading positions
+        var candidates = [];
+        for (var i = 0; i < lines.length; i++) {
+          if (lines[i].replace(/^#+\s+/, '').trim() === heading) {
+            var level = (lines[i].match(/^(#+)/) || ['', '#'])[1].length;
+            var secEnd = lines.length;
+            for (var j = i + 1; j < lines.length; j++) {
+              var hMatch = lines[j].match(/^(#+)\s/);
+              if (hMatch && hMatch[1].length <= level) {
+                secEnd = j;
+                break;
+              }
+            }
+            candidates.push({ start: i, end: secEnd });
+          }
+        }
+
+        // Use headingOccurrence to pick the right candidate directly
+        var occ = typeof headingOccurrence === 'number' ? headingOccurrence : 0;
+        if (candidates.length > 0) {
+          var pick = Math.min(occ, candidates.length - 1);
+          sectionStart = candidates[pick].start;
+          sectionEnd = candidates[pick].end;
+        }
+      }
+
+      // Search within the section first, then globally
+      var searchStart = sectionStart >= 0 ? sectionStart : 0;
+      var searchEnd = sectionStart >= 0 ? sectionEnd : lines.length;
+
+      for (var i = searchStart; i < searchEnd; i++) {
+        if (lines[i].toLowerCase().indexOf(lowerQuery) !== -1) {
+          matchLineIdx = i;
+          break;
+        }
+      }
+
+      // Fallback: search globally if not found in section
+      if (matchLineIdx === -1) {
+        for (var i = 0; i < lines.length; i++) {
+          if (lines[i].toLowerCase().indexOf(lowerQuery) !== -1) {
+            matchLineIdx = i;
+            break;
+          }
+        }
+      }
+
+      if (matchLineIdx === -1) {
+        // If still not found, show the heading's section or beginning
+        if (sectionStart >= 0) {
+          matchLineIdx = sectionStart;
+        } else {
+          matchLineIdx = 0;
+        }
+      }
+
+      // Expand context to include full sections (don't cut in the middle of tables/lists)
+      var start = Math.max(0, matchLineIdx - contextLines);
+      var end = Math.min(lines.length, matchLineIdx + contextLines + 1);
+
+      // Extend start backwards to the nearest heading for context
+      for (var i = start; i >= Math.max(0, start - 10); i--) {
+        if (/^#+\s/.test(lines[i])) {
+          start = i;
+          break;
+        }
+      }
+
+      // Regex matching code fences (optionally indented up to 3 spaces)
+      var fenceRe = /^\s{0,3}```/;
+
+      // Ensure start doesn't cut into an open code block
+      // Count fences from document start to our start line
+      var fencesBefore = 0;
+      for (var i = 0; i < start; i++) {
+        if (fenceRe.test(lines[i])) fencesBefore++;
+      }
+      if (fencesBefore % 2 === 1) {
+        // start is inside a code block — move start back to its opening fence
+        for (var i = start - 1; i >= 0; i--) {
+          if (fenceRe.test(lines[i])) {
+            start = i;
+            break;
+          }
+        }
+      }
+
+      // Ensure end doesn't cut into an open code block
+      var inCodeBlock = false;
+      for (var i = start; i < end; i++) {
+        if (fenceRe.test(lines[i])) inCodeBlock = !inCodeBlock;
+      }
+      if (inCodeBlock) {
+        // Find closing code fence — no limit, include the entire block
+        for (var i = end; i < lines.length; i++) {
+          end = i + 1;
+          if (fenceRe.test(lines[i])) break;
+        }
+      }
+
+      var contextMd = lines.slice(start, end).join('\n');
+      var hasMore = start > 0 || end < lines.length;
+      return { markdown: contextMd, hasMore: hasMore, startLine: start, endLine: end, matchLine: matchLineIdx };
+    }
+
+    function highlightInHtml(html, query) {
+      if (!query) return html;
+      // Only highlight in text nodes, not inside HTML tags
+      var escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      var re = new RegExp('(>)([^<]*?)(' + escaped + ')([^<]*?)(<)', 'gi');
+      return html.replace(re, function(match, pre, before, term, after, post) {
+        return pre + before + '<mark class="bg-yellow-200 rounded px-0.5">' + term + '</mark>' + after + post;
+      });
+    }
+
+    async function showPreview(idx) {
+      var d = searchResultData[idx];
+      if (!d) return;
+      var model = d.model, file = d.file, heading = d.heading, query = d.query, docUrl = d.docUrl, sectionText = d.sectionText, headingOccurrence = d.headingOccurrence;
+
+      // Highlight active result
+      searchContent.querySelectorAll('.search-result-item').forEach(function(el) {
+        el.classList.remove('ring-2', 'ring-accent-400', 'border-accent-400');
+      });
+      var activeItem = searchContent.querySelector('.search-result-item[data-idx="' + idx + '"]');
+      if (activeItem) {
+        activeItem.classList.add('ring-2', 'ring-accent-400', 'border-accent-400');
+      }
+
+      // Show panel with loading state
+      previewPanel.classList.remove('hidden');
+      previewContent.innerHTML = '<div class="text-center text-neutral-400 py-8">' +
+        (LOCALE === 'de' ? 'Vorschau wird geladen…' : 'Loading preview…') + '</div>';
+
+      // Set heading and link
+      var fileLabels = {
+        'model_documentation.md': LOCALE === 'de' ? 'Modell-Übersicht' : 'Model Overview',
+        'table_documentation.md': LOCALE === 'de' ? 'Tabellen & Spalten' : 'Tables & Columns',
+        'measure_documentation.md': 'Measures',
+        'import_logic_documentation.md': LOCALE === 'de' ? 'Import-Logik' : 'Import Logic',
+        'calculation_item_documentation.md': 'Calculation Items',
+        'udf_documentation.md': 'UDFs',
+      };
+      previewHeading.textContent = (fileLabels[file] || file) + (heading ? ' › ' + heading : '');
+      previewOpenLink.href = docUrl;
+
+      try {
+        var mdText = await fetchMarkdown(model, file);
+        var ctx = extractContext(mdText, heading, query, 15, sectionText, headingOccurrence);
+        var rawHtml = '';
+
+        if (typeof marked !== 'undefined') {
+          rawHtml = marked.parse(ctx.markdown)
+            .replace(/<(\/?)(style)(\s|>)/gi, '&lt;$1$2$3')
+            .replace(/<(\/?)(script)(\s|>)/gi, '&lt;$1$2$3');
+        } else {
+          rawHtml = '<pre class="whitespace-pre-wrap text-sm">' + escapeHtml(ctx.markdown) + '</pre>';
+        }
+
+        var highlighted = highlightInHtml(rawHtml, query);
+
+        var output = '';
+        if (ctx.startLine > 0) {
+          output += '<div class="text-xs text-neutral-400 mb-3 pb-2 border-b border-neutral-100">⋯ ' +
+            (LOCALE === 'de' ? 'Inhalt davor ausgeblendet' : 'Content above hidden') + '</div>';
+        }
+        output += highlighted;
+        if (ctx.endLine < mdText.split('\n').length) {
+          output += '<div class="text-xs text-neutral-400 mt-3 pt-2 border-t border-neutral-100">⋯ ' +
+            (LOCALE === 'de' ? 'Inhalt danach ausgeblendet' : 'Content below hidden') + '</div>';
+        }
+        previewContent.innerHTML = output;
+
+        // Scroll to first highlight
+        var firstMark = previewContent.querySelector('mark');
+        if (firstMark) {
+          setTimeout(function() { firstMark.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100);
+        }
+      } catch (err) {
+        previewContent.innerHTML = '<div class="text-center text-red-400 py-8">' +
+          (LOCALE === 'de' ? 'Vorschau konnte nicht geladen werden.' : 'Preview could not be loaded.') + '</div>';
+      }
+    }
+
+    // Mermaid rendering for previews
+    async function initMermaid() {
+      if (typeof mermaid === 'undefined') return;
+      var sources = document.querySelectorAll('.model-preview:not(.hidden) .mermaid-source');
+      if (sources.length === 0) return;
+      for (var i = 0; i < sources.length; i++) {
+        var el = sources[i];
+        if (!el.getAttribute('data-mmd-src')) el.setAttribute('data-mmd-src', el.textContent);
+        el.classList.remove('mermaid-source');
+        el.classList.add('mermaid');
+        try {
+          await mermaid.run({ nodes: [el] });
+          wrapMermaidDiagram(el);
+          rewriteMermaidLinks(el);
+        } catch (err) {
+          console.warn('Mermaid rendering error:', err);
+          el.classList.add('mermaid-error');
+          el.innerHTML = '<div class="text-sm text-neutral-400 italic py-4">Diagram could not be rendered</div>';
+        }
+      }
+    }
+
+    /* ── Rewrite Mermaid click-href links (rendered as SVG <a>) ── */
+    function rewriteMermaidLinks(el) {
+      var svgEl = el.tagName === 'svg' ? el : el.querySelector('svg');
+      if (!svgEl) return;
+      var previewDiv = el.closest('.model-preview');
+      var baseUrl = previewDiv ? previewDiv.getAttribute('data-model-url') : '';
+      if (!baseUrl) return;
+      var links = svgEl.querySelectorAll('a');
+      for (var i = 0; i < links.length; i++) {
+        var a = links[i];
+        var href = a.getAttribute('href') || a.getAttributeNS('http://www.w3.org/1999/xlink', 'href') || '';
+        var match = href.match(/^(\w+_documentation\.md)(?:#(.+))?$/);
+        if (!match) continue;
+        var filePart = match[1];
+        var fragment = match[2] || '';
+        var tabSlug = filePart.replace('_documentation.md', '').replace('import_logic', 'import').replace('calculation_item', 'calculation');
+        var newHash = fragment ? tabSlug + '__' + fragment : tabSlug;
+        var newUrl = baseUrl + '#' + newHash;
+        a.setAttribute('href', newUrl);
+        if (a.hasAttributeNS('http://www.w3.org/1999/xlink', 'href')) {
+          a.setAttributeNS('http://www.w3.org/1999/xlink', 'href', newUrl);
+        }
+      }
+    }
+
+    /* ── Mermaid zoom & fullscreen ── */
+    var mermaidIdCounter = 0;
+
+    function wrapMermaidDiagram(el) {
+      if (el.parentElement && el.parentElement.classList.contains('mermaid-viewport')) return;
+      var id = 'mmd-' + (mermaidIdCounter++);
+
+      var wrapper = document.createElement('div');
+      wrapper.className = 'mermaid-wrapper';
+      wrapper.setAttribute('data-mmd-id', id);
+      wrapper.setAttribute('data-zoom', '1');
+
+      var controls = document.createElement('div');
+      controls.className = 'mermaid-controls';
+      controls.innerHTML =
+        '<button type="button" title="Zoom out" onclick="mmdZoom(\'' + id + '\', -1)">−</button>' +
+        '<button type="button" class="mermaid-zoom-label" data-zoom-label="' + id + '">100%</button>' +
+        '<button type="button" title="Zoom in" onclick="mmdZoom(\'' + id + '\', 1)">+</button>' +
+        '<button type="button" title="Fullscreen" onclick="mmdFullscreen(\'' + id + '\')">' +
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>' +
+        '</button>';
+
+      var viewport = document.createElement('div');
+      viewport.className = 'mermaid-viewport';
+
+      el.parentNode.insertBefore(wrapper, el);
+      viewport.appendChild(el);
+      wrapper.appendChild(controls);
+      wrapper.appendChild(viewport);
+
+      viewport.addEventListener('wheel', function(e) {
+        if (e.ctrlKey || e.metaKey) return;
+        e.preventDefault();
+        var delta = e.deltaY < 0 ? 1 : -1;
+        mmdZoomAtCursor(id, delta, e, viewport);
+      }, { passive: false });
+
+      // Drag / pan
+      (function(vp) {
+        var startX, startY, scrollL, scrollT, dragging = false;
+        vp.addEventListener('mousedown', function(e) {
+          if (e.button !== 0) return;
+          dragging = true;
+          startX = e.clientX; startY = e.clientY;
+          scrollL = vp.scrollLeft; scrollT = vp.scrollTop;
+          vp.classList.add('dragging');
+        });
+        window.addEventListener('mousemove', function(e) {
+          if (!dragging) return;
+          vp.scrollLeft = scrollL - (e.clientX - startX);
+          vp.scrollTop = scrollT - (e.clientY - startY);
+        });
+        window.addEventListener('mouseup', function() {
+          if (!dragging) return;
+          dragging = false;
+          vp.classList.remove('dragging');
+        });
+      })(viewport);
+    }
+
+    function mmdZoomAtCursor(id, direction, e, viewport) {
+      var wrapper = document.querySelector('[data-mmd-id="' + id + '"]');
+      if (!wrapper) return;
+      var oldZoom = parseFloat(wrapper.getAttribute('data-zoom')) || 1;
+      var newZoom = direction > 0 ? Math.min(oldZoom + 0.25, 5) : Math.max(oldZoom - 0.25, 0.25);
+      if (newZoom === oldZoom) return;
+
+      var rect = viewport.getBoundingClientRect();
+      var cursorX = e.clientX - rect.left + viewport.scrollLeft;
+      var cursorY = e.clientY - rect.top + viewport.scrollTop;
+
+      var ratio = newZoom / oldZoom;
+      wrapper.setAttribute('data-zoom', newZoom.toString());
+      var pre = wrapper.querySelector('pre.mermaid');
+      if (pre) pre.style.transform = 'scale(' + newZoom + ')';
+
+      viewport.scrollLeft = cursorX * ratio - (e.clientX - rect.left);
+      viewport.scrollTop = cursorY * ratio - (e.clientY - rect.top);
+
+      var label = wrapper.querySelector('[data-zoom-label="' + id + '"]');
+      if (label) label.textContent = Math.round(newZoom * 100) + '%';
+    }
+
+    function mmdZoom(id, direction) {
+      var wrapper = document.querySelector('[data-mmd-id="' + id + '"]');
+      if (!wrapper) return;
+      var zoom = parseFloat(wrapper.getAttribute('data-zoom')) || 1;
+      zoom = direction > 0 ? Math.min(zoom + 0.25, 5) : Math.max(zoom - 0.25, 0.25);
+      wrapper.setAttribute('data-zoom', zoom.toString());
+      var pre = wrapper.querySelector('pre.mermaid');
+      if (pre) pre.style.transform = 'scale(' + zoom + ')';
+      var label = wrapper.querySelector('[data-zoom-label="' + id + '"]');
+      if (label) label.textContent = Math.round(zoom * 100) + '%';
+    }
+
+    /* ── Fullscreen ── */
+    var fsOverlay = null;
+    var fsZoom = 1;
+    var fsSourceId = null;
+
+    function getOrCreateOverlay() {
+      if (fsOverlay) return fsOverlay;
+      var div = document.createElement('div');
+      div.className = 'mermaid-fullscreen-overlay';
+      div.innerHTML =
+        '<div class="mermaid-fullscreen-header">' +
+          '<button type="button" title="Zoom out" onclick="mmdFsZoom(-1)">−</button>' +
+          '<button type="button" class="fs-zoom-label" id="fs-zoom-label">100%</button>' +
+          '<button type="button" title="Zoom in" onclick="mmdFsZoom(1)">+</button>' +
+          '<button type="button" title="Close (Esc)" onclick="mmdFsClose()">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+          '</button>' +
+        '</div>' +
+        '<div class="mermaid-fullscreen-body" id="fs-body"></div>';
+      document.body.appendChild(div);
+
+      div.querySelector('.mermaid-fullscreen-body').addEventListener('wheel', function(e) {
+        if (e.ctrlKey || e.metaKey) return;
+        e.preventDefault();
+        var delta = e.deltaY < 0 ? 1 : -1;
+        mmdFsZoomAtCursor(delta, e);
+      }, { passive: false });
+
+      // Drag / pan in fullscreen
+      (function(body) {
+        var startX, startY, scrollL, scrollT, dragging = false;
+        body.addEventListener('mousedown', function(e) {
+          if (e.button !== 0) return;
+          dragging = true;
+          startX = e.clientX; startY = e.clientY;
+          scrollL = body.scrollLeft; scrollT = body.scrollTop;
+          body.classList.add('dragging');
+        });
+        window.addEventListener('mousemove', function(e) {
+          if (!dragging) return;
+          body.scrollLeft = scrollL - (e.clientX - startX);
+          body.scrollTop = scrollT - (e.clientY - startY);
+        });
+        window.addEventListener('mouseup', function() {
+          if (!dragging) return;
+          dragging = false;
+          body.classList.remove('dragging');
+        });
+      })(div.querySelector('.mermaid-fullscreen-body'));
+
+      fsOverlay = div;
+      return div;
+    }
+
+    function mmdFullscreen(id) {
+      var wrapper = document.querySelector('[data-mmd-id="' + id + '"]');
+      if (!wrapper) return;
+      var svg = wrapper.querySelector('.mermaid-viewport svg');
+      if (!svg) return;
+
+      var overlay = getOrCreateOverlay();
+      var body = overlay.querySelector('#fs-body');
+      body.innerHTML = '';
+
+      var container = document.createElement('div');
+      container.className = 'fs-svg-container';
+      var clone = svg.cloneNode(true);
+      clone.removeAttribute('style');
+      var vb = svg.getAttribute('viewBox');
+      if (vb) { var p = vb.split(/[\s,]+/); clone.setAttribute('width', p[2]); clone.setAttribute('height', p[3]); }
+      else { var r = svg.getBoundingClientRect(); clone.setAttribute('width', r.width); clone.setAttribute('height', r.height); }
+      container.appendChild(clone);
+      body.appendChild(container);
+
+      fsZoom = 1;
+      fsSourceId = id;
+      container.style.transform = 'scale(1)';
+      overlay.querySelector('#fs-zoom-label').textContent = '100%';
+      overlay.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function mmdFsZoom(direction) {
+      fsZoom = direction > 0 ? Math.min(fsZoom + 0.25, 5) : Math.max(fsZoom - 0.25, 0.25);
+      var overlay = fsOverlay;
+      if (!overlay) return;
+      var container = overlay.querySelector('#fs-body .fs-svg-container');
+      if (container) container.style.transform = 'scale(' + fsZoom + ')';
+      overlay.querySelector('#fs-zoom-label').textContent = Math.round(fsZoom * 100) + '%';
+    }
+
+    function mmdFsZoomAtCursor(direction, e) {
+      var overlay = fsOverlay;
+      if (!overlay) return;
+      var body = overlay.querySelector('#fs-body');
+      var container = body.querySelector('.fs-svg-container');
+      if (!container) return;
+
+      var oldZoom = fsZoom;
+      fsZoom = direction > 0 ? Math.min(fsZoom + 0.25, 5) : Math.max(fsZoom - 0.25, 0.25);
+      if (fsZoom === oldZoom) return;
+
+      var rect = body.getBoundingClientRect();
+      var cursorX = e.clientX - rect.left + body.scrollLeft;
+      var cursorY = e.clientY - rect.top + body.scrollTop;
+      var ratio = fsZoom / oldZoom;
+
+      container.style.transform = 'scale(' + fsZoom + ')';
+      body.scrollLeft = cursorX * ratio - (e.clientX - rect.left);
+      body.scrollTop = cursorY * ratio - (e.clientY - rect.top);
+
+      overlay.querySelector('#fs-zoom-label').textContent = Math.round(fsZoom * 100) + '%';
+    }
+
+    function mmdFsClose() {
+      if (fsOverlay) {
+        fsOverlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') mmdFsClose();
+    });
+
+    /* ── SVG Embeds ── */
+    var svgIdCounter = 0;
+
+    function initSvgEmbeds() {
+      var sources = document.querySelectorAll('.model-preview:not(.hidden) .svg-source');
+      for (var i = 0; i < sources.length; i++) {
+        wrapSvgEmbed(sources[i]);
+      }
+    }
+
+    function wrapSvgEmbed(el) {
+      if (el.parentElement && el.parentElement.classList.contains('svg-embed-viewport')) return;
+      var id = 'svg-' + (svgIdCounter++);
+      var animated = el.getAttribute('data-animated') === 'true';
+
+      var wrapper = document.createElement('div');
+      wrapper.className = 'svg-embed-wrapper';
+      wrapper.setAttribute('data-svg-id', id);
+      wrapper.setAttribute('data-zoom', '1');
+
+      var controls = document.createElement('div');
+      controls.className = 'svg-embed-controls';
+      var html = '';
+      if (animated) {
+        html += '<button type="button" class="svg-pause-btn" title="Pause animation" data-svg-pause="' + id + '" onclick="svgToggleAnimation(\'' + id + '\')">'
+          + '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>'
+          + '</button>';
+      }
+      html +=
+        '<button type="button" title="Zoom out" onclick="svgZoom(\'' + id + '\', -1)">\u2212</button>' +
+        '<button type="button" class="svg-embed-zoom-label" data-svg-zoom-label="' + id + '">100%</button>' +
+        '<button type="button" title="Zoom in" onclick="svgZoom(\'' + id + '\', 1)">+</button>' +
+        '<button type="button" title="Fullscreen" onclick="svgFullscreen(\'' + id + '\')">'
+        + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>'
+        + '</button>';
+      controls.innerHTML = html;
+
+      var viewport = document.createElement('div');
+      viewport.className = 'svg-embed-viewport';
+
+      var inner = document.createElement('div');
+      inner.className = 'svg-embed-inner';
+      inner.innerHTML = el.innerHTML;
+
+      el.parentNode.insertBefore(wrapper, el);
+      viewport.appendChild(inner);
+      wrapper.appendChild(controls);
+      wrapper.appendChild(viewport);
+      el.remove();
+
+      viewport.addEventListener('wheel', function(e) {
+        if (e.ctrlKey || e.metaKey) return;
+        e.preventDefault();
+        svgZoomAtCursor(id, e.deltaY < 0 ? 1 : -1, e, viewport);
+      }, { passive: false });
+
+      (function(vp) {
+        var startX, startY, scrollL, scrollT, dragging = false;
+        vp.addEventListener('mousedown', function(e) {
+          if (e.button !== 0) return;
+          dragging = true;
+          startX = e.clientX; startY = e.clientY;
+          scrollL = vp.scrollLeft; scrollT = vp.scrollTop;
+          vp.classList.add('dragging');
+        });
+        window.addEventListener('mousemove', function(e) {
+          if (!dragging) return;
+          vp.scrollLeft = scrollL - (e.clientX - startX);
+          vp.scrollTop = scrollT - (e.clientY - startY);
+        });
+        window.addEventListener('mouseup', function() {
+          if (!dragging) return;
+          dragging = false;
+          vp.classList.remove('dragging');
+        });
+      })(viewport);
+    }
+
+    function svgZoom(id, direction) {
+      var wrapper = document.querySelector('[data-svg-id="' + id + '"]');
+      if (!wrapper) return;
+      var zoom = parseFloat(wrapper.getAttribute('data-zoom')) || 1;
+      zoom = direction > 0 ? Math.min(zoom + 0.25, 5) : Math.max(zoom - 0.25, 0.25);
+      wrapper.setAttribute('data-zoom', zoom.toString());
+      var inner = wrapper.querySelector('.svg-embed-inner');
+      if (inner) inner.style.transform = 'scale(' + zoom + ')';
+      var label = wrapper.querySelector('[data-svg-zoom-label="' + id + '"]');
+      if (label) label.textContent = Math.round(zoom * 100) + '%';
+    }
+
+    function svgZoomAtCursor(id, direction, e, viewport) {
+      var wrapper = document.querySelector('[data-svg-id="' + id + '"]');
+      if (!wrapper) return;
+      var oldZoom = parseFloat(wrapper.getAttribute('data-zoom')) || 1;
+      var newZoom = direction > 0 ? Math.min(oldZoom + 0.25, 5) : Math.max(oldZoom - 0.25, 0.25);
+      if (newZoom === oldZoom) return;
+      var rect = viewport.getBoundingClientRect();
+      var cursorX = e.clientX - rect.left + viewport.scrollLeft;
+      var cursorY = e.clientY - rect.top + viewport.scrollTop;
+      var ratio = newZoom / oldZoom;
+      wrapper.setAttribute('data-zoom', newZoom.toString());
+      var inner = wrapper.querySelector('.svg-embed-inner');
+      if (inner) inner.style.transform = 'scale(' + newZoom + ')';
+      viewport.scrollLeft = cursorX * ratio - (e.clientX - rect.left);
+      viewport.scrollTop = cursorY * ratio - (e.clientY - rect.top);
+      var label = wrapper.querySelector('[data-svg-zoom-label="' + id + '"]');
+      if (label) label.textContent = Math.round(newZoom * 100) + '%';
+    }
+
+    function svgToggleAnimation(id) {
+      var wrapper = document.querySelector('[data-svg-id="' + id + '"]');
+      if (!wrapper) return;
+      var btn = wrapper.querySelector('[data-svg-pause="' + id + '"]');
+      var svgEl = wrapper.querySelector('.svg-embed-inner svg');
+      if (!svgEl) return;
+      var paused = wrapper.getAttribute('data-paused') === 'true';
+      if (paused) {
+        wrapper.setAttribute('data-paused', 'false');
+        var pauseStyle = svgEl.querySelector('style[data-pause-style]');
+        if (pauseStyle) pauseStyle.remove();
+        if (typeof svgEl.unpauseAnimations === 'function') svgEl.unpauseAnimations();
+        if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>';
+        if (btn) btn.title = 'Pause animation';
+      } else {
+        wrapper.setAttribute('data-paused', 'true');
+        var style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+        style.setAttribute('data-pause-style', 'true');
+        style.textContent = '* { animation-play-state: paused !important; }';
+        svgEl.insertBefore(style, svgEl.firstChild);
+        if (typeof svgEl.pauseAnimations === 'function') svgEl.pauseAnimations();
+        if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6,4 20,12 6,20"/></svg>';
+        if (btn) btn.title = 'Resume animation';
+      }
+    }
+
+    function svgFullscreen(id) {
+      var wrapper = document.querySelector('[data-svg-id="' + id + '"]');
+      if (!wrapper) return;
+      var svg = wrapper.querySelector('.svg-embed-inner svg');
+      if (!svg) return;
+      var overlay = getOrCreateOverlay();
+      var body = overlay.querySelector('#fs-body');
+      body.innerHTML = '';
+      var container = document.createElement('div');
+      container.className = 'fs-svg-container';
+      var clone = svg.cloneNode(true);
+      clone.removeAttribute('style');
+      var vb = svg.getAttribute('viewBox');
+      if (vb) { var p = vb.split(/[\s,]+/); clone.setAttribute('width', p[2]); clone.setAttribute('height', p[3]); }
+      else { var r = svg.getBoundingClientRect(); clone.setAttribute('width', r.width); clone.setAttribute('height', r.height); }
+      container.appendChild(clone);
+      body.appendChild(container);
+      fsZoom = 1;
+      fsSourceId = id;
+      container.style.transform = 'scale(1)';
+      overlay.querySelector('#fs-zoom-label').textContent = '100%';
+      overlay.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    // Dark mode toggle
+    async function reinitMermaid() {
+      if (typeof mermaid === 'undefined') return;
+      var isDark = document.documentElement.classList.contains('dark');
+      mermaid.initialize({ startOnLoad: false, theme: isDark ? 'dark' : 'default', securityLevel: 'loose', flowchart: { useMaxWidth: true }, er: { useMaxWidth: true } });
+      document.querySelectorAll('.mermaid-wrapper').forEach(function(w) {
+        var pre = w.querySelector('pre.mermaid');
+        if (pre && pre.getAttribute('data-mmd-src')) {
+          var newPre = document.createElement('pre');
+          newPre.className = 'mermaid-source';
+          newPre.textContent = pre.getAttribute('data-mmd-src');
+          w.parentNode.insertBefore(newPre, w);
+          w.remove();
+        }
+      });
+      document.querySelectorAll('pre.mermaid:not(.mermaid-source)').forEach(function(el) {
+        if (el.getAttribute('data-mmd-src')) {
+          var newPre = document.createElement('pre');
+          newPre.className = 'mermaid-source';
+          newPre.textContent = el.getAttribute('data-mmd-src');
+          el.parentNode.insertBefore(newPre, el);
+          el.remove();
+        }
+      });
+      await initMermaid();
+    }
+
+    var darkToggle = document.getElementById('dark-toggle');
+    if (darkToggle) {
+      darkToggle.addEventListener('click', function() {
+        document.documentElement.classList.toggle('dark');
+        var isDark = document.documentElement.classList.contains('dark');
+        localStorage.setItem('semadoc-theme', isDark ? 'dark' : 'light');
+        reinitMermaid();
+      });
+    }
+
+    window.addEventListener('load', function() {
+      initMermaid();
+      initSvgEmbeds();
+    });
+
+    // Help modal
+    (function() {
+      var modal = document.getElementById('help-modal');
+      var toggle = document.getElementById('help-toggle');
+      var closeBtn = document.getElementById('help-modal-close');
+      var backdrop = document.getElementById('help-modal-backdrop');
+      function openHelp() { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+      function closeHelp() { modal.classList.add('hidden'); document.body.style.overflow = ''; }
+      if (toggle) toggle.addEventListener('click', openHelp);
+      if (closeBtn) closeBtn.addEventListener('click', closeHelp);
+      if (backdrop) backdrop.addEventListener('click', closeHelp);
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeHelp(); });
+    })();
+  </script>
+</BaseLayout>

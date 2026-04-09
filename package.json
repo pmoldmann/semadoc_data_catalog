@@ -1,0 +1,35 @@
+{
+  "name": "webpage_paulmoldmann",
+  "version": "1.0.0",
+  "description": "code for semadoc.io",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pmoldmann/webpage_paulmoldmann.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/pmoldmann/webpage_paulmoldmann/issues"
+  },
+  "homepage": "https://github.com/pmoldmann/webpage_paulmoldmann#readme",
+  "dependencies": {
+    "@astrojs/sitemap": "^3.7.0",
+    "@astrojs/tailwind": "^6.0.2",
+    "ajv": "^8.18.0",
+    "astro": "^5.18.0",
+    "marked": "^17.0.4",
+    "tailwindcss": "^3.4.19"
+  },
+  "devDependencies": {
+    "@fontsource/inter": "^5.2.8"
+  }
+}

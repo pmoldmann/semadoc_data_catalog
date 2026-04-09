@@ -1,0 +1,143 @@
+---
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import type { Locale } from '../i18n';
+import { t, getLocalizedPath } from '../i18n';
+
+interface Props {
+  title: string;
+  description?: string;
+  locale: Locale;
+  currentPath?: string;
+  keywords?: string;
+  ogImage?: string;
+  schemaType?: 'website' | 'product' | 'person';
+}
+
+const { title, description = '', locale, currentPath = '', keywords = '', ogImage = '/logos/logo_semadoc_hero.svg', schemaType = 'website' } = Astro.props;
+const canonicalUrl = `https://semadoc.io/${locale}${currentPath ? `/${currentPath}` : ''}`;
+const fullTitle = `${title} | SemaDoc`;
+---
+
+<!doctype html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    {keywords && <meta name="keywords" content={keywords} />}
+    <meta name="author" content="SemaDoc" />
+    <meta name="robots" content="noai, noimageai" />
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="icon" type="image/svg+xml" href="/logos/logo_semadoc_icon.svg" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content={schemaType === 'product' ? 'product' : 'website'} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={`https://semadoc.io${ogImage}`} />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:site_name" content="SemaDoc" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={`https://semadoc.io${ogImage}`} />
+
+    <title>{fullTitle}</title>
+    <style is:global>
+      @font-face {
+        font-family: 'Inter';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('/fonts/inter-latin-400-normal.woff2') format('woff2');
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+      @font-face {
+        font-family: 'Inter';
+        font-style: normal;
+        font-weight: 500;
+        font-display: swap;
+        src: url('/fonts/inter-latin-500-normal.woff2') format('woff2');
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+      @font-face {
+        font-family: 'Inter';
+        font-style: normal;
+        font-weight: 600;
+        font-display: swap;
+        src: url('/fonts/inter-latin-600-normal.woff2') format('woff2');
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+      @font-face {
+        font-family: 'Inter';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('/fonts/inter-latin-700-normal.woff2') format('woff2');
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+    </style>
+
+    <!-- JSON-LD Structured Data -->
+    {schemaType === 'product' && (
+      <script type="application/ld+json" set:html={JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "SemaDoc",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "description": "Enterprise data catalog for Power BI Semantic Models. Automated Markdown documentation at the push of a button.",
+        "url": "https://semadoc.io/de/product",
+        "author": {
+          "@type": "Person",
+          "name": "Paul Moldmann",
+          "url": "https://semadoc.io"
+        },
+        "offers": {
+          "@type": "Offer",
+          "availability": "https://schema.org/InStock",
+          "priceCurrency": "EUR"
+        }
+      })} />
+    )}
+    {schemaType === 'person' && (
+      <script type="application/ld+json" set:html={JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Person",
+        "name": "Paul Moldmann",
+        "jobTitle": "Power BI Freelancer",
+        "url": "https://semadoc.io",
+        "sameAs": [
+          "https://www.linkedin.com/in/paulmoldmann/",
+          "https://www.xing.com/profile/Paul_Moldmann",
+          "https://github.com/PaulMoldmann"
+        ],
+        "knowsAbout": ["Power BI", "DAX", "Power Query", "Data Modeling", "Business Intelligence", "SemaDoc"]
+      })} />
+    )}
+    {schemaType === 'website' && (
+      <script type="application/ld+json" set:html={JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Paul Moldmann – SemaDoc",
+        "url": "https://semadoc.io",
+        "description": "SemaDoc – Enterprise data catalog for Power BI. Automated documentation for Semantic Models.",
+        "author": {
+          "@type": "Person",
+          "name": "Paul Moldmann"
+        }
+      })} />
+    )}
+  </head>
+  <body class="min-h-screen flex flex-col bg-white text-neutral-800 font-sans antialiased">
+    <Header locale={locale} currentPath={currentPath} />
+    <main class="flex-1">
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>

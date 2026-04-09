@@ -1,0 +1,14 @@
+RewriteEngine On
+
+# Clean URLs
+DirectoryIndex index.html
+
+# Block direct access to .md files
+<FilesMatch "\.md$">
+  Require all denied
+</FilesMatch>
+
+# AI training opt-out header
+<IfModule mod_headers.c>
+  Header set X-Robots-Tag "noai, noimageai"
+</IfModule>
