@@ -1153,31 +1153,20 @@ const workspaces = [...new Set(models.map(m => m.workspace).filter(Boolean))].so
       previewOpenLink.href = docUrl;
 
       try {
-        var mdText = await fetchMarkdown(model, file);
-        var ctx = extractContext(mdText, heading, query, 15, sectionText, headingOccurrence);
+        // Use section text from search index (no API call needed for static site)
+        var mdText = (heading ? '## ' + heading + '\n\n' : '') + sectionText;
         var rawHtml = '';
 
         if (typeof marked !== 'undefined') {
-          rawHtml = marked.parse(ctx.markdown)
+          rawHtml = marked.parse(mdText)
             .replace(/<(\/?)(style)(\s|>)/gi, '&lt;$1$2$3')
             .replace(/<(\/?)(script)(\s|>)/gi, '&lt;$1$2$3');
         } else {
-          rawHtml = '<pre class="whitespace-pre-wrap text-sm">' + escapeHtml(ctx.markdown) + '</pre>';
+          rawHtml = '<pre class="whitespace-pre-wrap text-sm">' + escapeHtml(mdText) + '</pre>';
         }
 
         var highlighted = highlightInHtml(rawHtml, query);
-
-        var output = '';
-        if (ctx.startLine > 0) {
-          output += '<div class="text-xs text-neutral-400 mb-3 pb-2 border-b border-neutral-100">⋯ ' +
-            (LOCALE === 'de' ? 'Inhalt davor ausgeblendet' : 'Content above hidden') + '</div>';
-        }
-        output += highlighted;
-        if (ctx.endLine < mdText.split('\n').length) {
-          output += '<div class="text-xs text-neutral-400 mt-3 pt-2 border-t border-neutral-100">⋯ ' +
-            (LOCALE === 'de' ? 'Inhalt danach ausgeblendet' : 'Content below hidden') + '</div>';
-        }
-        previewContent.innerHTML = output;
+        previewContent.innerHTML = highlighted;
 
         // Scroll to first highlight
         var firstMark = previewContent.querySelector('mark');
