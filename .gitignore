@@ -1,0 +1,36 @@
+# build output
+dist/
+
+# dependencies
+node_modules/
+
+# environment variables – never commit real secrets
+.env
+.env.production
+.env.local
+# .env.example is intentionally NOT ignored (contains no real secrets)
+
+# IDE
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# astro
+.astro/
+
+# python
+__pycache__/
+*.pyc
+
+# specstory
+.specstory
+
+# markdown files
+src/data/markdown/
+
+# copilot instructions
+copilot-installations.md
