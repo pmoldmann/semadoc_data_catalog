@@ -79,7 +79,8 @@ src/data/markdown/
 │   ├── import_logic_documentation.md
 │   ├── calculation_item_documentation.md
 │   ├── udf_documentation.md
-│   └── security_documentation.md
+│   ├── security_documentation.md
+│   └── model_quality_documentation.md
 └── (further models …)
 ```
 

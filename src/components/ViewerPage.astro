@@ -216,9 +216,10 @@ const viewerLabels = JSON.stringify({
       'calculation_item_documentation.md': { slug: 'calculation', label: L.tab_calculation || 'Calculation Items' },
       'udf_documentation.md':              { slug: 'udf',         label: L.tab_udf || 'UDFs' },
       'security_documentation.md':         { slug: 'security',    label: L.tab_security || 'Security' },
+      'model_quality_documentation.md':     { slug: 'quality',     label: L.tab_quality || 'Model Quality' },
     };
 
-    var TAB_ORDER = ['model', 'table', 'measure', 'import', 'calculation', 'udf', 'security'];
+    var TAB_ORDER = ['model', 'quality', 'table', 'measure', 'import', 'calculation', 'udf', 'security'];
 
     /* ── Configure marked with the same renderer as the static pages ── */
     function slugify(text) {
@@ -226,7 +227,7 @@ const viewerLabels = JSON.stringify({
     }
 
     function fileToTabSlug(href) {
-      return href.replace('_documentation.md', '').replace('import_logic', 'import').replace('calculation_item', 'calculation');
+      return href.replace('_documentation.md', '').replace('import_logic', 'import').replace('calculation_item', 'calculation').replace('model_quality', 'quality');
     }
 
     function sanitizeHtml(html) {

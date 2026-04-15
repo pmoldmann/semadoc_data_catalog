@@ -16,7 +16,7 @@ export function slugify(text: string): string {
 
 /** Map a documentation filename to its tab slug */
 export function fileToTabSlug(href: string): string {
-  return href.replace('_documentation.md', '').replace('import_logic', 'import').replace('calculation_item', 'calculation');
+  return href.replace('_documentation.md', '').replace('import_logic', 'import').replace('calculation_item', 'calculation').replace('model_quality', 'quality');
 }
 
 /** Detect whether an SVG string contains animations (CSS or SMIL) */
@@ -141,6 +141,7 @@ export function loadModelData(folderName: string, locale: Locale) {
 
   const docFiles = [
     { slug: 'model', file: 'model_documentation.md', label: strings.doc_tabs.model },
+    { slug: 'quality', file: 'model_quality_documentation.md', label: strings.doc_tabs.quality },
     { slug: 'table', file: 'table_documentation.md', label: strings.doc_tabs.table },
     { slug: 'measure', file: 'measure_documentation.md', label: strings.doc_tabs.measure },
     { slug: 'import', file: 'import_logic_documentation.md', label: strings.doc_tabs.import },

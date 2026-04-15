@@ -1,6 +1,6 @@
 # Documentation of Generated Files
 
-This help describes the six Markdown files that `generate_docs.py` produces per Semantic Model. Each chapter describes the structure, purpose and contains examples from the generated documentation.
+This help describes the eight Markdown files that `generate_docs.py` produces per Semantic Model. Each chapter describes the structure, purpose and contains examples from the generated documentation.
 
 > All files are stored in the folder `docs/output/{model_name}/`.
 
@@ -9,11 +9,13 @@ This help describes the six Markdown files that `generate_docs.py` produces per 
 ## Table of Contents
 
 1. [model_documentation.md](#1-model_documentationmd)
-2. [table_documentation.md](#2-table_documentationmd)
-3. [measure_documentation.md](#3-measure_documentationmd)
-4. [udf_documentation.md](#4-udf_documentationmd)
-5. [calculation_item_documentation.md](#5-calculation_item_documentationmd)
-6. [import_logic_documentation.md](#6-import_logic_documentationmd)
+2. [model_quality_documentation.md](#2-model_quality_documentationmd)
+3. [table_documentation.md](#3-table_documentationmd)
+4. [measure_documentation.md](#4-measure_documentationmd)
+5. [udf_documentation.md](#5-udf_documentationmd)
+6. [calculation_item_documentation.md](#6-calculation_item_documentationmd)
+7. [import_logic_documentation.md](#7-import_logic_documentationmd)
+8. [security_documentation.md](#8-security_documentationmd)
 
 ---
 
@@ -123,7 +125,57 @@ Links to the five other documentation files.
 
 ---
 
-## 2. table_documentation.md
+## 2. model_quality_documentation.md
+
+Consolidated data quality report for the Semantic Model. This file aggregates quality issues that were previously scattered across table-level documentation into a single, dedicated model-level view.
+
+### Purpose
+
+Provides a central place to review all data quality issues — missing descriptions, referential integrity violations, orphan tables, hidden column anomalies and other structural problems — across the entire model at a glance.
+
+### Sections
+
+#### Title Block
+
+Metadata including total quality issue count and last report date.
+
+> **Total Quality Issues:** 14 | **Report Date:** 2026-03-12
+
+#### Quality Summary
+
+High-level summary table showing issue counts by category (e.g. Missing Descriptions, RI Violations, Orphan Tables).
+
+**Purpose:** Prioritization — tells you at a glance which category has the most issues.
+
+| Category | Issue Count | Severity |
+|----------|------------:|---------||
+| Missing Descriptions — Tables | 15 | Medium |
+| Missing Descriptions — Measures | 25 | Medium |
+| Referential Integrity Violations | 1 | High |
+| Orphan Tables | 1 | Low |
+
+#### Detailed Issue List
+
+Full list of all identified issues with object name, object type, category, severity and a short description.
+
+**Purpose:** Actionable list for model owners to systematically address quality gaps.
+
+| Object | Object Type | Category | Severity | Description |
+|--------|-------------|----------|---------|-------------|
+| Manufacturer | Table | RI Violation | High | 1 referential integrity violation detected |
+| HTML_Test | Table | Orphan Table | Low | No relationships — potentially disconnected |
+
+#### AI-Generated Quality Assessment
+
+AI-generated narrative summarising the overall quality situation, highlighting the most critical issues and suggesting remediation priorities.
+
+**Purpose:** Provides context and prioritisation guidance beyond the raw issue list.
+
+> This tab is only displayed if the file is present in the model folder.
+
+---
+
+## 3. table_documentation.md
 
 Detailed documentation of all tables and columns in the model.
 
@@ -232,7 +284,7 @@ Bar chart and table of data sources by type.
 
 ---
 
-## 3. measure_documentation.md
+## 4. measure_documentation.md
 
 Documentation of all DAX measures in the model.
 
@@ -313,7 +365,7 @@ statistical measures enable period-over-period comparisons and outlier detection
 
 ---
 
-## 4. udf_documentation.md
+## 5. udf_documentation.md
 
 Documentation of all User Defined Functions (UDFs) — reusable DAX functions in the model.
 
@@ -378,7 +430,7 @@ measures and calculation groups, supporting dynamic analytics and time intellige
 
 ---
 
-## 5. calculation_item_documentation.md
+## 6. calculation_item_documentation.md
 
 Documentation of all Calculation Items (Calculation Groups) in the model.
 
@@ -433,7 +485,7 @@ RETURN result
 
 ---
 
-## 6. import_logic_documentation.md
+## 7. import_logic_documentation.md
 
 Documentation of the Power Query (M) import logic for all tables.
 
@@ -532,3 +584,38 @@ The documentation consistently uses colour coding:
 | | 🔵 Blue | Data source |
 
 All sections use anchor links for navigation between overview tables and detail sections.
+
+---
+
+## 8. security_documentation.md
+
+Documentation of the Row-Level Security (RLS) configuration of the Semantic Model.
+
+### Sections
+
+#### Title Block
+
+Metadata and total number of defined security roles.
+
+> **Total Security Roles:** 2
+
+#### Security Roles Overview
+
+Overview table of all roles with name, member count and a brief description of the access restriction logic.
+
+**Purpose:** Quick assessment of how many roles exist and what data access they control.
+
+#### Per-Role Details
+
+For each role:
+
+| Element | Purpose |
+|---|---|
+| **Members** | List of users or groups assigned to the role. |
+| **Filter Table** | Which tables the DAX filter expression applies to. |
+| **DAX Filter Expression** | The complete filter expression restricting data access per role. |
+| **AI Description** | AI-generated plain-language explanation of what data the role can see. |
+
+**Purpose:** Traceability of access restrictions. Enables review of RLS logic without opening Power BI Desktop.
+
+> This tab is only displayed if the model defines at least one RLS role.

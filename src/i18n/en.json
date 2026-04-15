@@ -48,7 +48,8 @@
     "import": "Import Logic",
     "calculation": "Calculation Items",
     "udf": "UDFs",
-    "security": "Security"
+    "security": "Security",
+    "quality": "Model Quality"
   },
   "doc_labels": {
     "page_title_suffix": "Documentation",
@@ -80,8 +81,8 @@
     "title": "SemaDoc Standalone Viewer",
     "subtitle": "Upload your SemaDoc Markdown files and view the documentation right in your browser — no server upload required.",
     "drop_heading": "Upload Markdown files",
-    "drop_text": "Drag up to 7 Markdown files here or click to select.",
-    "drop_hint": "Supported files: model_documentation.md, table_documentation.md, measure_documentation.md, import_logic_documentation.md, calculation_item_documentation.md, udf_documentation.md, security_documentation.md",
+    "drop_text": "Drag up to 8 Markdown files here or click to select.",
+    "drop_hint": "Supported files: model_documentation.md, table_documentation.md, measure_documentation.md, import_logic_documentation.md, calculation_item_documentation.md, udf_documentation.md, security_documentation.md, model_quality_documentation.md",
     "privacy_note": "Your files never leave the browser — everything is processed locally.",
     "reset": "Reset",
     "unknown_file": "Unrecognized file",

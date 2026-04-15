@@ -11,10 +11,11 @@ const FILE_LABELS: Record<string, { de: string; en: string }> = {
   'calculation_item_documentation.md': { de: 'Calculation Items', en: 'Calculation Items' },
   'udf_documentation.md': { de: 'UDFs', en: 'UDFs' },
   'security_documentation.md': { de: 'Zugriffsbeschränkungen', en: 'Security' },
+  'model_quality_documentation.md': { de: 'Modell-Qualität', en: 'Model Quality' },
 };
 
 function fileToSlug(file: string): string {
-  return file.replace('_documentation.md', '').replace('import_logic', 'import');
+  return file.replace('_documentation.md', '').replace('import_logic', 'import').replace('model_quality', 'quality');
 }
 
 /** Strip code blocks and mermaid diagrams to reduce index size, keep all other text */

@@ -1,12 +1,16 @@
 # Model Documentation Help
 
-This page shows the automatically generated documentation for a Power BI Semantic Model. The documentation is divided into seven sections, accessible via the tabs above.
+This page shows the automatically generated documentation for a Power BI Semantic Model. The documentation is divided into eight sections, accessible via the tabs above.
 
 ---
 
 ## Model
 
 The starting point of the documentation. Here you find metadata (workspace, last update), an AI-generated summary of the model's business purpose, and key metrics: number of tables, columns, measures, and relationships. A Mermaid diagram visualizes the data model architecture with its fact and dimension tables. The overview is supplemented by data quality notes, such as missing descriptions or referential integrity violations.
+
+## Model Quality
+
+Consolidated data quality report for the Semantic Model. This tab aggregates all quality issues — missing descriptions, referential integrity violations, orphan tables, and other structural problems — into a single model-level view. An AI-generated summary provides context and prioritisation guidance. This tab is only displayed if the file is present.
 
 ## Tables
 
